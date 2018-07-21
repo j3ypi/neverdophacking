@@ -72,13 +72,9 @@ rownames(data.manip.na.table.df)<-"Na%"
 head(data.manip.na.table.df)
 
 #delete if there is more than x% na - variable to hack p afterwards through grid search
-x<-0.2
+x<-0
 
-for(i in 1: ncol(data.manip.na.table.df)){
-  if(data.manip.na.table.df[,i]>x){
-    data.manip.df[,i]<-NULL
-  }
-}
+data.manip.df<-data.manip.df[colSums(!is.na(data.manip.df)) > 0]
 
 write.csv(data.manip.df,".\\Data\\Manipulated_Data.csv")
 
@@ -90,19 +86,13 @@ write.csv(data.manip.df,".\\Data\\Manipulated_Data.csv")
 #1. -------------------------------------------------------
 
 #train dataset
-x<-data.manip.df[,-2]
+x<-as.matrix(data.manip.df[,-2])
 y<-data.manip.df[,2]
 train = sample(1:nrow(x), nrow(x)/2)
 test = (-train)
 ytest = y[test]
 
+isna<-is.na(y)
+glmnet(x[!isna,],y[!isna],"gaussian",alpha=1)
 
-#select vars to keep with lasso
-na_index <- is.na(y)
-
-#we do have NAs hence PLS does not work
-lambda <- 10^seq(10, -2, length = 100)
-lasso.mod <- glmnet(x[!na_index,], y[!na_index], alpha = 1, lambda = lambda)
-lasso.pred <- predict(lasso.mod, s = bestlam, newx = x[test,])
-mean((lasso.pred-ytest)^2)
 
