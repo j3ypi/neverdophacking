@@ -4,19 +4,31 @@ library(modelr)
 setwd("C:\\Users\\smzim\\OneDrive\\Dokumente\\Programm\\Github\\neverdophacking")
 data.df<-read.csv(".\\Data\\data.csv")
 
-#Data exploration
+#Data exploration-------------------------------------------------------
 summary(data.df) 
 sapply(data.df, class)
 str(data.df)
+capture.output(str(data.df[,names(Filter(is.factor, data.manip.df))]), file = "vars.txt")
 
-#data manipulation
+#data manipulation-------------------------------------------------------
 data.manip.df<-data.df
 #DATETIME/DATE/YEAR - Date dismiss for first analysis
 data.manip.df$DATETIME<-NULL
 data.manip.df$DATE<-NULL
 data.manip.df$YEAR<-NULL
+data.manip.df$WDWTICKETSEASON<-NULL #dublicate
 
-#write function to cobert factors to dummies
+
+
+#convert INSESSION variables to variables without percent
+
+INSESSIONnames<-c("INSESSION", "INSESSION_ENROLLMENT", "INSESSION_WDW", "INSESSION_DLR", "INSESSION_SQRT_WDW", "INSESSION_SQRT_DLR", "INSESSION_CALIFORNIA", "INSESSION_DC", "INSESSION_CENTRAL_FL", "INSESSION_DRIVE1_FL","INSESSION_DRIVE2_FL", "INSESSION_DRIVE_CA", "INSESSION_FLORIDA", "INSESSION_MARDI_GRAS", "INSESSION_MIDWEST", "INSESSION_NY_NJ", "INSESSION_NY_NJ_PA", "INSESSION_NEW_ENGLAND", "INSESSION_NEW_JERSEY", "INSESSION_NOTHWEST", "INSESSION_PLANES", "INSESSION_SOCAL", "INSESSION_SOUTHWEST")
+for(i in INSESSIONnames){
+  data.manip.df[ ,i] <- as.numeric(sub("%", "", x=data.manip.df[ , i]))
+}
+
+
+#write function to convert factors to dummies
 factodum<-function(variable,dataset){
   help.df<-dataset[,c(variable,"MERCHANDISE")]
   numboflev<-nlevels(help.df[,1])
@@ -29,15 +41,45 @@ factodum<-function(variable,dataset){
   for(i in 1:numboflev){
     colnames(dataset)[numbofcol+i] <- paste(variable,i)
   }
+  dataset[,variable]<-NULL
   
   assign('dataset',dataset, envir=.GlobalEnv)
 }
 
-#WDW_TICKET_SEASON - 3 Factors transform to dummy
-factodum("WDW_TICKET_SEASON",data.manip.df)
-data.manip.df<-dataset
-#SEASON - 17 Factors transform to dummy
+factornames<-names(Filter(is.factor, data.manip.df))
+factornames<-c("HOLIDAY","SEASON","WDW_TICKET_SEASON")
+for(i in factornames){
+  factodum(i,data.manip.df)
+  data.manip.df<-dataset
+}
+#delete unnecessary variables
+factornames<-names(Filter(is.factor, data.manip.df))
+for(i in factornames){
+  data.manip.df[,i]<-NULL
+}
+
+#deleted all variables with less than 50% variables
+#create table with percentage NA
+data.manip.na.table.df<-data.manip.df
+for(i in 1:ncol(data.manip.na.table.df)){
+  data.manip.na.table.df[1,i]<-(sum(is.na(data.manip.df[,i]))/nrow(data.manip.na.table.df))
+}
+
+data.manip.na.table.df<-data.manip.na.table.df[1,]
+rownames(data.manip.na.table.df)<-"Na%"
+head(data.manip.na.table.df)
+
+#delete if there is more than x% na - variable to hack p afterwards through grid search
+x<-20
+
+for(i in 1: ncol(data.manip.na.table.df)){
+  
+  if(data.manip.na.table.df[,i]>x){
+    data.manip.df[,i]<-NULL
+  }
+  
+}
 
 
-#deleted alö variables with less than 50% variables
+
 
