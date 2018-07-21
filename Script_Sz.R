@@ -71,6 +71,9 @@ data.manip.na.table.df<-data.manip.na.table.df[1,]
 rownames(data.manip.na.table.df)<-"Na%"
 head(data.manip.na.table.df)
 
+#baseline model
+summary(lm(data.manip.df$MERCHANDISE~data.manip.df$SPOSTMIN,data.manip.df))
+
 #delete if there is more than x% na - variable to hack p afterwards through grid search
 x<-0
 
@@ -85,7 +88,7 @@ write.csv(data.manip.df,".\\Data\\Manipulated_Data.csv")
 
 #1. -------------------------------------------------------
 
-#train dataset
+#split dataset
 x<-as.matrix(data.manip.df[,-2])
 y<-data.manip.df[,2]
 train = sample(1:nrow(x), nrow(x)/2)
@@ -93,5 +96,8 @@ test = (-train)
 ytest = y[test]
 
 isna<-is.na(y)
+#model
 LASSO1<-glmnet(x[!isna,],y[!isna],"gaussian",alpha=1)
-predict(LASSO1, type = 'coefficients', s = 0.01)
+vars<-predict(LASSO1, type = 'coefficients', s = 0.01)
+#nicht vollständig bin müde
+summary(lm(data.manip.df$MERCHANDISE~data.manip.df$SPOSTMIN+data.manip.df$INSESSION_DRIVE1_FL+data.manip.df$AKEMHMORN+data.manip.df$AKEMHMTOM+data.manip.df$AKHOURSEMH+data.manip.df$HSHOURSEMHTOM+data.manip.df$WDWMINTEMP+data.manip.df$WEATHER_WDWPRECIP+data.manip.df$CAPACITYLOST_MK,data.manip.df))
