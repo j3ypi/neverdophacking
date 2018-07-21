@@ -1,5 +1,6 @@
 #Script Simon P-Hacking-Challenge
 library(modelr)
+library(glmnet)
 
 setwd("C:\\Users\\smzim\\OneDrive\\Dokumente\\Programm\\Github\\neverdophacking")
 data.df<-read.csv(".\\Data\\data.csv")
@@ -46,8 +47,9 @@ factodum<-function(variable,dataset){
   assign('dataset',dataset, envir=.GlobalEnv)
 }
 
-factornames<-names(Filter(is.factor, data.manip.df))
-factornames<-c("HOLIDAY","SEASON","WDW_TICKET_SEASON")
+#factornames<-c("HOLIDAY","SEASON","WDW_TICKET_SEASON","WDWEVENTN","WDWRACEN","WDWSEASON", "MKEVENTN", "EPEVENTN", "HSEVENTN", "HOLIDAYJ") - fehler wenn NA in der Spalte drinnen ist glaub ich
+factornames<-c("HOLIDAY","SEASON","WDW_TICKET_SEASON","WDWSEASON")
+
 for(i in factornames){
   factodum(i,data.manip.df)
   data.manip.df<-dataset
@@ -70,16 +72,37 @@ rownames(data.manip.na.table.df)<-"Na%"
 head(data.manip.na.table.df)
 
 #delete if there is more than x% na - variable to hack p afterwards through grid search
-x<-20
+x<-0.2
 
 for(i in 1: ncol(data.manip.na.table.df)){
-  
   if(data.manip.na.table.df[,i]>x){
     data.manip.df[,i]<-NULL
   }
-  
 }
 
+write.csv(data.manip.df,".\\Data\\Manipulated_Data.csv")
+
+#Analysis-------------------------------------------------------
+#idea: 1. we select relevant variables through a lasso regression and run diferent regression models
+#      2. Brute force
+#---covariance matrix checken
+
+#1. -------------------------------------------------------
+
+#train dataset
+x<-data.manip.df[,-2]
+y<-data.manip.df[,2]
+train = sample(1:nrow(x), nrow(x)/2)
+test = (-train)
+ytest = y[test]
 
 
+#select vars to keep with lasso
+na_index <- is.na(y)
+
+#we do have NAs hence PLS does not work
+lambda <- 10^seq(10, -2, length = 100)
+lasso.mod <- glmnet(x[!na_index,], y[!na_index], alpha = 1, lambda = lambda)
+lasso.pred <- predict(lasso.mod, s = bestlam, newx = x[test,])
+mean((lasso.pred-ytest)^2)
 
