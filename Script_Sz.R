@@ -93,6 +93,5 @@ test = (-train)
 ytest = y[test]
 
 isna<-is.na(y)
-glmnet(x[!isna,],y[!isna],"gaussian",alpha=1)
-
-
+LASSO1<-glmnet(x[!isna,],y[!isna],"gaussian",alpha=1)
+predict(LASSO1, type = 'coefficients', s = 0.01)
