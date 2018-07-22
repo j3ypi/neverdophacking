@@ -1,15 +1,25 @@
 #Script Simon P-Hacking-Challenge
 library(modelr)
+library(tidyverse)
+library(here)
+library(rio)
+library(broom)
+library(magrittr)
 library(glmnet)
+library(remef)
+#install.packages("devtools")
+#devtools::install_github("hohenstein/remef")
+
+set.seed(3)
 
 setwd("C:\\Users\\smzim\\OneDrive\\Dokumente\\Programm\\Github\\neverdophacking")
 data.df<-read.csv(".\\Data\\data.csv")
 
 #Data exploration-------------------------------------------------------
-summary(data.df) 
-sapply(data.df, class)
-str(data.df)
-capture.output(str(data.df[,names(Filter(is.factor, data.manip.df))]), file = "vars.txt")
+#summary(data.df) 
+#sapply(data.df, class)
+#str(data.df)
+#capture.output(str(data.df[,names(Filter(is.factor, data.manip.df))]), file = "vars.txt")
 
 #data manipulation-------------------------------------------------------
 data.manip.df<-data.df
@@ -46,8 +56,6 @@ factodum<-function(variable,dataset){
   
   assign('dataset',dataset, envir=.GlobalEnv)
 }
-
-#factornames<-c("HOLIDAY","SEASON","WDW_TICKET_SEASON","WDWEVENTN","WDWRACEN","WDWSEASON", "MKEVENTN", "EPEVENTN", "HSEVENTN", "HOLIDAYJ") - fehler wenn NA in der Spalte drinnen ist glaub ich
 factornames<-c("HOLIDAY","SEASON","WDW_TICKET_SEASON","WDWSEASON")
 
 for(i in factornames){
@@ -60,7 +68,7 @@ for(i in factornames){
   data.manip.df[,i]<-NULL
 }
 
-#deleted all variables with less than 50% variables
+#deleted all variables lots of NA
 #create table with percentage NA
 data.manip.na.table.df<-data.manip.df
 for(i in 1:ncol(data.manip.na.table.df)){
@@ -99,11 +107,11 @@ ytest = y[test]
 lambda <- 10^seq(10, -2, length = 100)
 lasso.mod <- glmnet(x[train,], y[train], alpha = 1, lambda = lambda)
 cv.out <- cv.glmnet(x[train,], y[train], alpha = 1)
-bestlam <- cv.out$lambda.min
+bestlam <- 3.5
 lasso.pred <- predict(lasso.mod, s = bestlam, newx = x[test,])
 lasso.coef  <- predict(lasso.mod, type = 'coefficients', s = bestlam)
 
-#save all nonzero coefficients
+#save all nonzero coefficients in dataframe m
 lasso.coef.list<-as.list(lasso.coef)
 n<-1
 c<-2
@@ -118,8 +126,10 @@ for(i in lasso.coef.list){
   n<-n+1
 }
 
-
+#delete dublicates
 m[,1:2]<-NULL
 
-summary(lm(MERCHANDISE~.,m))
-#bin zu Faul die namen anzugleichen aber wir haben jetzt p=0.089446
+fit<-(lm(MERCHANDISE~.,m))
+summary(fit)
+coef(summary(fit))["SPOSTMIN", 4] #-p-value
+
