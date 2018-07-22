@@ -1,85 +1,88 @@
-#Script Simon P-Hacking-Challenge
+##################
+# neverdophacking
+##################
+library(tidyverse)
+library(here)
+library(rio)
+library(broom)
+library(magrittr)
 library(modelr)
 library(glmnet)
 
-setwd("C:\\Users\\smzim\\OneDrive\\Dokumente\\Programm\\Github\\neverdophacking")
-data.df<-read.csv(".\\Data\\data.csv")
+source("factordum.R")
+data.df <- import(here("Data", "data.csv"), setclass = "tbl")
 
-#Data exploration-------------------------------------------------------
+# Data exploration-------------------------------------------------------
 summary(data.df) 
 sapply(data.df, class)
 str(data.df)
-capture.output(str(data.df[,names(Filter(is.factor, data.manip.df))]), file = "vars.txt")
+# capture.output(str(data.df[,names(Filter(is.factor, data.manip.df))]), file = "vars.txt")
 
-#data manipulation-------------------------------------------------------
-data.manip.df<-data.df
-#DATETIME/DATE/YEAR - Date dismiss for first analysis
-data.manip.df$DATETIME<-NULL
-data.manip.df$DATE<-NULL
-data.manip.df$YEAR<-NULL
-data.manip.df$WDWTICKETSEASON<-NULL #dublicate
+# Data manipulation-------------------------------------------------------
+data.manip.df <- data.df %>% 
+  mutate_if(is_character, as_factor)
+# erstes mal fuer mich, dass Faktoren tatsaechlich von Nutzen sind
 
+# DATETIME/DATE/YEAR - Date dismiss for first analysis
+data.manip.df$DATETIME <- NULL
+data.manip.df$DATE <- NULL
+data.manip.df$YEAR <- NULL
+data.manip.df$WDWTICKETSEASON <- NULL #dublicate
 
-
-#convert INSESSION variables to variables without percent
-
-INSESSIONnames<-c("INSESSION", "INSESSION_ENROLLMENT", "INSESSION_WDW", "INSESSION_DLR", "INSESSION_SQRT_WDW", "INSESSION_SQRT_DLR", "INSESSION_CALIFORNIA", "INSESSION_DC", "INSESSION_CENTRAL_FL", "INSESSION_DRIVE1_FL","INSESSION_DRIVE2_FL", "INSESSION_DRIVE_CA", "INSESSION_FLORIDA", "INSESSION_MARDI_GRAS", "INSESSION_MIDWEST", "INSESSION_NY_NJ", "INSESSION_NY_NJ_PA", "INSESSION_NEW_ENGLAND", "INSESSION_NEW_JERSEY", "INSESSION_NOTHWEST", "INSESSION_PLANES", "INSESSION_SOCAL", "INSESSION_SOUTHWEST")
-for(i in INSESSIONnames){
-  data.manip.df[ ,i] <- as.numeric(sub("%", "", x=data.manip.df[ , i]))
+# Convert INSESSION variables to variables without percent sign into numeric
+percent <- function(x) {
+  as.numeric(str_extract(x, "\\d+"))
 }
 
+data.manip.df %<>% 
+  mutate_at(vars(starts_with("INSESSION")), funs(percent)) %>% 
+  as.data.frame()
 
-#write function to convert factors to dummies
-factodum<-function(variable,dataset){
-  help.df<-dataset[,c(variable,"MERCHANDISE")]
-  numboflev<-nlevels(help.df[,1])
-  help.df<-model_matrix(dataset,~help.df[,1]-1)
-  numbofcol<-ncol(dataset)
-  dataset<-cbind(dataset,help.df)
-  
-  
-  #rename variables
-  for(i in 1:numboflev){
-    colnames(dataset)[numbofcol+i] <- paste(variable,i)
-  }
-  dataset[,variable]<-NULL
-  
-  assign('dataset',dataset, envir=.GlobalEnv)
-}
+factornames <- data.manip.df %>%
+  select_if(is.factor) %>% 
+  names() 
 
-#factornames<-c("HOLIDAY","SEASON","WDW_TICKET_SEASON","WDWEVENTN","WDWRACEN","WDWSEASON", "MKEVENTN", "EPEVENTN", "HSEVENTN", "HOLIDAYJ") - fehler wenn NA in der Spalte drinnen ist glaub ich
-factornames<-c("HOLIDAY","SEASON","WDW_TICKET_SEASON","WDWSEASON")
+# Function to convert factors to dummies
+# (funktioniert nur mit data.frame, nicht tibbles)
+data.manip.df <- factodum(data.manip.df, factornames)
 
-for(i in factornames){
-  factodum(i,data.manip.df)
-  data.manip.df<-dataset
-}
 #delete unnecessary variables
-factornames<-names(Filter(is.factor, data.manip.df))
-for(i in factornames){
-  data.manip.df[,i]<-NULL
+factornames <- names(Filter(is.factor, data.manip.df))
+
+for (i in factornames) {
+  data.manip.df[ ,i] <- NULL
 }
 
-#deleted all variables with less than 50% variables
-#create table with percentage NA
-data.manip.na.table.df<-data.manip.df
-for(i in 1:ncol(data.manip.na.table.df)){
-  data.manip.na.table.df[1,i]<-(sum(is.na(data.manip.df[,i]))/nrow(data.manip.na.table.df))
+# deleted all variables with less than 50% variables
+# create table with percentage NA
+# Preis fuer laengsten Datensatznamen? <3 Aber Nice gemacht
+data.manip.na.table.df <- data.manip.df
+for (i in 1:ncol(data.manip.na.table.df)) {
+  data.manip.na.table.df[1, i] <- (sum(is.na(data.manip.df[ ,i])) / nrow(data.manip.na.table.df))
 }
 
-data.manip.na.table.df<-data.manip.na.table.df[1,]
-rownames(data.manip.na.table.df)<-"Na%"
+data.manip.na.table.df <- data.manip.na.table.df[1,]
+rownames(data.manip.na.table.df) <- "Na%"
 head(data.manip.na.table.df)
 
-#baseline model
-summary(lm(data.manip.df$MERCHANDISE~data.manip.df$SPOSTMIN,data.manip.df))
+# baseline model
+base_model <- lm(MERCHANDISE ~ SPOSTMIN, data = data.manip.df)
+tidy(base_model)
+glance(base_model)
 
-#delete if there is more than x% na - variable to hack p afterwards through grid search
-x<-0
+# delete if there is more than x% na - variable to hack p afterwards through grid search
+# funktionierte vorher nicht
+x <- 0.5
 
-data.manip.df<-data.manip.df[colSums(!is.na(data.manip.df)) > 0]
+missings <- colnames(data.manip.na.table.df[ ,data.manip.na.table.df > x])
 
-write.csv(data.manip.df,".\\Data\\Manipulated_Data.csv")
+data.manip.df %>% 
+  select(-missings) %>% 
+  as_tibble()
+
+# data.manip.df <- data.manip.df[colSums(!is.na(data.manip.df)) > 0]
+
+export(data.manip.df, here("Data", "Manipulated_Data.csv"))
 
 #Analysis-------------------------------------------------------
 #idea: 1. we select relevant variables through a lasso regression and run diferent regression models
@@ -88,16 +91,19 @@ write.csv(data.manip.df,".\\Data\\Manipulated_Data.csv")
 
 #1. -------------------------------------------------------
 
-#split dataset
-x<-as.matrix(data.manip.df[,-2])
-y<-data.manip.df[,2]
-train = sample(1:nrow(x), nrow(x)/2)
-test = (-train)
-ytest = y[test]
+# Split dataset
+x <- as.matrix(data.manip.df[ ,-2])
+y <- data.manip.df[ ,2]
+train <- sample(1:nrow(x), nrow(x)/2)
+test <- (-train)
+ytest <- y[test]
 
-isna<-is.na(y)
-#model
-LASSO1<-glmnet(x[!isna,],y[!isna],"gaussian",alpha=1)
-vars<-predict(LASSO1, type = 'coefficients', s = 0.01)
-#nicht vollständig bin müde
-summary(lm(data.manip.df$MERCHANDISE~data.manip.df$SPOSTMIN+data.manip.df$INSESSION_DRIVE1_FL+data.manip.df$AKEMHMORN+data.manip.df$AKEMHMTOM+data.manip.df$AKHOURSEMH+data.manip.df$HSHOURSEMHTOM+data.manip.df$WDWMINTEMP+data.manip.df$WEATHER_WDWPRECIP+data.manip.df$CAPACITYLOST_MK,data.manip.df))
+isna <- is.na(y)
+# Model
+LASSO1 <- glmnet(x[!isna,], y[!isna], "gaussian", alpha = 1)
+vars <- predict(LASSO1, type = 'coefficients', s = 0.01)
+# nicht vollstaendig bin muede
+lasso_model <- lm(MERCHANDISE ~ SPOSTMIN + INSESSION_DRIVE1_FL + AKEMHMORN + AKEMHMTOM + AKHOURSEMH + HSHOURSEMHTOM + 
+             WDWMINTEMP + WEATHER_WDWPRECIP+ CAPACITYLOST_MK,data.manip.df, data = data.manip.df)
+tidy(lasso_model)
+glance(lasso_model)
