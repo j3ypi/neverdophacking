@@ -74,7 +74,7 @@ head(data.manip.na.table.df)
 #baseline model - 0.114 = p
 summary(lm(data.manip.df$MERCHANDISE~data.manip.df$SPOSTMIN,data.manip.df))
 
-#delete if there is more than x% na - variable to hack p afterwards through grid search
+#delete if there is more than x na - variable to hack p afterwards through grid search
 x<-100
 
 data.manip.df<-data.manip.df[colSums(!is.na(data.manip.df)) > x]
@@ -95,27 +95,31 @@ train = sample(1:nrow(x), nrow(x)/2)
 test = (-train)
 ytest = y[test]
 
-#model
+#model- Select variables through LASSO
 lambda <- 10^seq(10, -2, length = 100)
-
 lasso.mod <- glmnet(x[train,], y[train], alpha = 1, lambda = lambda)
 cv.out <- cv.glmnet(x[train,], y[train], alpha = 1)
 bestlam <- cv.out$lambda.min
 lasso.pred <- predict(lasso.mod, s = bestlam, newx = x[test,])
 lasso.coef  <- predict(lasso.mod, type = 'coefficients', s = bestlam)
 
-
 #save all nonzero coefficients
 lasso.coef.list<-as.list(lasso.coef)
-n<-0
+n<-1
+c<-2
 m<-data.frame(data.manip.df$MERCHANDISE)
 for(i in lasso.coef.list){
   if(i!=0){
+    
     m<-cbind(m,data.manip.df[,n])
+    colnames(m)[c]<-(names(data.manip.df)[n])
+    c<-c+1
   }
   n<-n+1
 }
 
-names(m)<-seq(1:ncol(m))
-summary(lm(m[,1]~.,m))
-#bin zu Faul die namen anzugleichen aber wir haben jetzt p=0.035
+
+m[,1:2]<-NULL
+
+summary(lm(MERCHANDISE~.,m))
+#bin zu Faul die namen anzugleichen aber wir haben jetzt p=0.089446
